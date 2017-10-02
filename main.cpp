@@ -18,6 +18,70 @@
 static GLuint compile_shader(GLenum type, std::string const &source);
 static GLuint link_program(GLuint vertex_shader, GLuint fragment_shader);
 
+std::unordered_map<Scene::Object*,bool> canJump;
+std::unordered_map<Scene::Object*,bool> isJumping;
+
+//with plane
+bool checkCollisionWithPlane(Scene::Object* obj1, Scene::Object* obj2){
+//    std::cout << std::abs(obj1->transform.position.z - obj1->transform.scale.z) << "\n";
+    if(canJump[obj1]==false){
+        if (obj1->transform.position.z - obj1->transform.scale.z<=obj2->transform.position.z) {
+            obj1->velocity = glm::vec3(0.0f);
+            canJump[obj1] = true;
+//            std::cout<<obj1->transform.position.z;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+//cube sphere
+inline float squared(float v) { return v * v; }
+bool cubeSphereCollision(Scene::Object* cube, Scene::Object* sphere)
+{
+    if ((sphere->transform.position.z - sphere->transform.scale.z  < cube->transform.position.z + 0.4f) &&
+        (sphere->transform.position.z  > cube->transform.position.z - 0.4f) &&
+        (cube->transform.position.y+cube->transform.scale.y > sphere->transform.position.y) &&
+        (cube->transform.position.y < sphere->transform.position.y + sphere->transform.scale.z)) {
+        
+//        float cor = 1.0f;
+        glm::vec3 N = glm::normalize(sphere->transform.position - cube->transform.position);
+//        glm::vec3 reflected = 2.0f * N * (N*sphere->velocity);
+        glm::vec3 new_vel = sphere->velocity - 2.0f * glm::dot(sphere->velocity, N) * N;
+        
+//        std::cout<< cube->velocity.z << "\n";
+        if(cube->velocity.z==0){
+            sphere->velocity = new_vel;
+        }
+        else{
+            sphere->velocity =  cube->velocity * 1.75f;
+//            cube->velocity = glm::vec3(0.0f,0.0f,0.0f);
+        }
+        
+//        std::cout << sphere->velocity.x << " " << sphere->velocity.y << " " << sphere->velocity.z << "\n";
+        
+        return true;
+    }
+    return false;
+}
+
+//Cubes
+//AABB Collision
+bool checkCollisionCubes(Scene::Object* obj1, Scene::Object* obj2){
+    if(std::abs(obj1->transform.position.y - obj2->transform.position.y) < obj1->transform.scale.y + obj2->transform.scale.y)
+    {
+        if(std::abs(obj1->transform.position.z - obj2->transform.position.z) < obj1->transform.scale.z + obj2->transform.scale.z)
+        {
+            obj1->velocity = glm::vec3(0.0f);
+            canJump[obj1] = true;
+            return true;
+        }
+    }
+    canJump[obj1] = false;
+    return false;
+}
+
 int main(int argc, char **argv) {
 	//Configuration:
 	struct {
@@ -26,18 +90,27 @@ int main(int argc, char **argv) {
 	} config;
     
     
-    bool isZPressed = false;
-    bool isXPressed = false;
-    bool isAPressed = false;
-    bool isSPressed = false;
-    bool isCommaPressed = false;
-    bool isColnPressed = false;
-    bool isPeriodPressed = false;
-    bool isSlashPressed = false;
+    bool isLeftPressed = false;
+    bool isRightPressed = false;
     
-    Scene::Object* Balloon1;
-    Scene::Object* Balloon2;
-    Scene::Object* Balloon3;
+    bool isAPressed = false;
+    bool isDPressed = false;
+
+    
+    Scene::Object* Player1;
+    Scene::Object* Player2;
+    
+    Scene::Object* Net;
+    Scene::Object* Ball;
+    
+    Scene::Object* Plane;
+    
+    
+    
+    glm::vec3 const GRAVITY = glm::vec3(0.0f,0.0f,-9.8f);
+    
+//    glm::vec3 P2_VEL = glm::vec3(0.0f,0.0f,0.0f);
+    const float GRAVITY_SCALE = 2.0f;
 
 	//------------  initialization ------------
 
@@ -189,7 +262,6 @@ int main(int argc, char **argv) {
 		return object;
 	};
     
-	std::vector< Scene::Object * > craneObj;
 
 	{ //read objects to add from "scene.blob":
 		std::ifstream file("scene.blob", std::ios::binary);
@@ -211,33 +283,34 @@ int main(int argc, char **argv) {
 			read_chunk(file, "scn0", &data);
 
 
-            add_object("Plane",  glm::vec3(0.0f, 0.0f, 0.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f));
-            add_object("Stand",  glm::vec3(0.0f, 0.0f, 0.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f));
-            Balloon1 = &add_object("Balloon1.001",  glm::vec3(0.9f, 2.2f, 1.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f));
-            Balloon2 = &add_object("Balloon1.001",  glm::vec3(-0.5f, -2.0f, 1.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.5f));
-            Balloon3 = &add_object("Balloon1.001",  glm::vec3(-2.5f, 0.0f, 1.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.5f));
-            craneObj.emplace_back(&add_object("Base",  glm::vec3(0.0f, 0.0f, 0.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)));
-            craneObj.emplace_back(&add_object("Link1",  glm::vec3(0.0f, 0.0f, 0.3f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)));
-            craneObj.emplace_back(&add_object("Link2",  glm::vec3(0.0f, 0.0f, 1.2f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)));
-            craneObj.emplace_back(&add_object("Link3",  glm::vec3(0.0f, 0.0f, 1.2f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f)));
+            
+            Player1 = &add_object("p1",  glm::vec3(0.0f, -10.0f, -6.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f));
+            canJump[Player1] = false;
+            isJumping[Player1] = false;
+            
+            Player2 = &add_object("p2",  glm::vec3(0.0f, 10.0f, -6.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f));
+            canJump[Player2] = false;
+            isJumping[Player2] = false;
+            
+            Net = &add_object("net",  glm::vec3(0.0f, 0.0f, -5.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(10.0f,0.05f,3.0f));
+            
+            Ball = &add_object("ball",  glm::vec3(0.0f, 10.0f, 5.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(1.0f));
+            Ball->velocity = glm::vec3(0.0f,0.0f,-1.0f);
+            
+            Plane = &add_object("floot",  glm::vec3(0.0f, 0.0f, -7.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(15.0f));
+//            Balloon2 = &add_object("p2",  glm::vec3(-0.5f, -2.0f, 1.0f), glm::quat(0.0f, 0.0f, 0.0f, 1.0f), glm::vec3(0.5f));
 		}
 	}
 
     
-    //Parent Crane Entities
-    for (uint32_t i = 1; i < craneObj.size(); ++i) {
-		craneObj[i]->transform.set_parent(&craneObj[i-1]->transform);
-	}
 
 
-	std::vector< float > wave_acc(craneObj.size(), 0.0f);
-
-	glm::vec2 mouse = glm::vec2(0.0f, 0.0f); //mouse position in [-1,1]x[-1,1] coordinates
+//	glm::vec2 mouse = glm::vec2(0.0f, 0.0f); //mouse position in [-1,1]x[-1,1] coordinates
 
 	struct {
-		float radius = 7.5f;
-		float elevation = -3.75834f;
-		float azimuth =-6.13125f;
+		float radius = 20.0f;
+		float elevation = 0.166667f;
+		float azimuth =0.0625f;
 		glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);
 	} camera;
 
@@ -250,29 +323,27 @@ int main(int argc, char **argv) {
             if (evt.type == SDL_KEYDOWN) {
                 
                 switch(evt.key.keysym.sym){
-                    case SDLK_z:
-                        isZPressed = true;
+                    case SDLK_w:
+                        if(canJump[Player1]){
+                            isJumping[Player1] = true;
+                        }
                         break;
-                    case SDLK_x:
-                        isXPressed = true;
+                    case SDLK_UP:
+                        if(canJump[Player2]){
+                            isJumping[Player2] = true;
+                        }
+                        break;
+                    case SDLK_LEFT:
+                        isLeftPressed = true;
                         break;
                     case SDLK_a:
                         isAPressed = true;
                         break;
-                    case SDLK_s:
-                        isSPressed = true;
+                    case SDLK_d:
+                        isDPressed = true;
                         break;
-                    case SDLK_SEMICOLON:
-                        isCommaPressed = true;
-                        break;
-                    case SDLK_QUOTE:
-                        isColnPressed = true;
-                        break;
-                    case SDLK_PERIOD:
-                        isPeriodPressed = true;
-                        break;
-                    case SDLK_SLASH:
-                        isSlashPressed = true;
+                    case SDLK_RIGHT:
+                        isRightPressed = true;
                         break;
                     default:
                         break;
@@ -281,29 +352,23 @@ int main(int argc, char **argv) {
             }
             else if (evt.type == SDL_KEYUP) {
                 switch(evt.key.keysym.sym){
-                    case SDLK_z:
-                        isZPressed = false;
+                    case SDLK_w:
+                        isJumping[Player1] = false;
                         break;
-                    case SDLK_x:
-                        isXPressed = false;
+                    case SDLK_UP:
+                        isJumping[Player2] = false;
+                        break;
+                    case SDLK_LEFT:
+                        isLeftPressed = false;
                         break;
                     case SDLK_a:
                         isAPressed = false;
                         break;
-                    case SDLK_s:
-                        isSPressed = false;
+                    case SDLK_d:
+                        isDPressed = false;
                         break;
-                    case SDLK_SEMICOLON:
-                        isCommaPressed = false;
-                        break;
-                    case SDLK_QUOTE:
-                        isColnPressed = false;
-                        break;
-                    case SDLK_PERIOD:
-                        isPeriodPressed = false;
-                        break;
-                    case SDLK_SLASH:
-                        isSlashPressed = false;
+                    case SDLK_RIGHT:
+                        isRightPressed = false;
                         break;
                     default:
                         break;
@@ -311,18 +376,18 @@ int main(int argc, char **argv) {
                 
             }
 			else if (evt.type == SDL_MOUSEMOTION) {
-				glm::vec2 old_mouse = mouse;
-				mouse.x = (evt.motion.x + 0.5f) / float(config.size.x) * 2.0f - 1.0f;
-				mouse.y = (evt.motion.y + 0.5f) / float(config.size.y) *-2.0f + 1.0f;
-				if (evt.motion.state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
-					camera.elevation += -2.0f * (mouse.y - old_mouse.y);
-					camera.azimuth += -2.0f * (mouse.x - old_mouse.x);
-                    
-				}
+//				glm::vec2 old_mouse = mouse;
+//				mouse.x = (evt.motion.x + 0.5f) / float(config.size.x) * 2.0f - 1.0f;
+//				mouse.y = (evt.motion.y + 0.5f) / float(config.size.y) *-2.0f + 1.0f;
+//				if (evt.motion.state & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+//					camera.elevation += -2.0f * (mouse.y - old_mouse.y);
+//					camera.azimuth += -2.0f * (mouse.x - old_mouse.x);
+//                    
+//				}
 			}
             else if (evt.type == SDL_MOUSEBUTTONUP) {
                 
-                std::cout << camera.elevation << " " << camera.azimuth;
+//                std::cout << camera.elevation << " " << camera.azimuth;
                 
             }
             else if (evt.type == SDL_MOUSEBUTTONDOWN) {
@@ -337,89 +402,99 @@ int main(int argc, char **argv) {
 
 		auto current_time = std::chrono::high_resolution_clock::now();
 		static auto previous_time = current_time;
-//		float elapsed = std::chrono::duration< float >(current_time - previous_time).count();
+		float elapsed = std::chrono::duration< float >(current_time - previous_time).count();
 		previous_time = current_time;
         
-        float speed = 0.01f;
+        
 
 		{ //update game state:
-            static float axes1 = 0.0f;
-            static float axes2 = 0.0f;
-            static float axes3 = 0.0f;
-            static float axes4 = 0.0f;
             
-            if(isZPressed)
-                axes1+=speed;
-            if(isXPressed)
-                axes1-=speed;
+            
+//            std::cout<< checkCollisionCubes(Player1,Player2) << "\n";
+            
+            bool player1Collision = checkCollisionCubes(Player1,Net);
+            bool player2Collision = checkCollisionCubes(Player2,Net);
+            
+            checkCollisionWithPlane(Player1,Plane);
+            checkCollisionWithPlane(Player2,Plane);
+            
+            cubeSphereCollision(Player1,Ball);
+            cubeSphereCollision(Player2,Ball);
+            
+            
+            Ball->velocity +=  GRAVITY*GRAVITY_SCALE * elapsed;
+            Ball->transform.position +=  Ball->velocity * elapsed;
+            
+            if(Ball->transform.position.z<-15.0f){
+                Ball->transform.position =  glm::vec3(0.0f, 10.0f, 5.0f);
+                Ball->velocity = glm::vec3(0.0f,0.0f,-1.0f);
+            }
+
+            
+            //player1
+            if(canJump[Player1]==false){
+                Player1->velocity +=  GRAVITY*GRAVITY_SCALE * elapsed;
+            }
+            if(isJumping[Player1] ==true){
+                Player1->velocity  = glm::vec3(0.0f,0.0f,12.0f);
+                isJumping[Player1] = false;
+                canJump[Player1]= false;
+            }
             if(isAPressed){
-                if(axes2>-0.29f)
-                    axes2-=speed;
+                if(!player1Collision)
+                    Player1->velocity.y = -7.0f;
+                else
+                    Player1->transform.position.y += 7.0f;
             }
-            if(isSPressed){
-                if(axes2<0.29f)
-                    axes2+=speed;
+            else if(isDPressed){
+                if(!player1Collision)
+                    Player1->velocity.y = 7.0f;
+                else
+                    Player1->transform.position.y -= 7.0f;
             }
-            if(isCommaPressed){
-                if(axes3>-0.39f)
-                    axes3-=speed;
+            else{
+                Player1->velocity.y = 0;
             }
-            if(isColnPressed){
-                if(axes3<0.39f)
-                    axes3+=speed;
+            Player1->transform.position +=  Player1->velocity * elapsed;
+            
+            //player2
+            if(canJump[Player2]==false){
+                Player2->velocity +=  GRAVITY*GRAVITY_SCALE * elapsed;
             }
-            if(isPeriodPressed){
-                if(axes4>-0.39f)
-                    axes4-=speed;
+            if(isJumping[Player2] ==true){
+                Player2->velocity  = glm::vec3(0.0f,0.0f,12.0f);
+                isJumping[Player2] = false;
+                canJump[Player2]= false;
             }
-            if(isSlashPressed){
-                if(axes4<0.39f)
-                    axes4+=speed;
+            if(isLeftPressed){
+                if(!player2Collision)
+                    Player2->velocity.y = -5.0f;
+                else
+                    Player2->transform.position.y += 5.0f;
+                
+            }
+            else if(isRightPressed){
+                if(!player2Collision)
+                    Player2->velocity.y = 5.0f;
+                else
+                    Player2->transform.position.y = -5.0f;
+                
+                player2Collision = false;
+            }
+            else{
+                Player2->velocity.y = 0;
             }
             
-            
-            
-			
-            craneObj[0]->transform.rotation = glm::angleAxis(
-                                                             axes1 * 2.0f * float(M_PI) * (0.8f),
-                                                             glm::vec3(0.0f,0.0f,1.0f)
-                                                             );
+//            {
+//                isLeftPressed = false;
+//                isRightPressed = false;
+//            }
 
-            craneObj[1]->transform.rotation = glm::angleAxis(
-                                                             axes2 * 2.0f * float(M_PI) * (0.8f),
-                                                             glm::vec3(1.0f,0.0f,0.0f)
-                                                             );
-
-            craneObj[2]->transform.rotation = glm::angleAxis(
-                                                             axes3 * 2.0f * float(M_PI) * (0.8f),
-                                                             glm::vec3(1.0f,0.0f,0.0f)
-                                                             );
+            Player2->transform.position +=  Player2->velocity * elapsed;
             
-            craneObj[3]->transform.rotation = glm::angleAxis(
-                                                             axes4 * 2.0f * float(M_PI) * (0.8f),
-                                                             glm::vec3(1.0f,0.0f,0.0f)
-                                                             );
-            
-            
-            static float ctr = 0.0f;
-            ctr+=speed;
-            //Balloon Up Down
-            Balloon1->transform.position.z +=  0.03f *std::sin(ctr*2);
-            Balloon2->transform.position.z +=  0.04f *std::sin(ctr*3);
-            Balloon3->transform.position.z +=  0.07f *std::sin(ctr*5);
-            
-            glm::mat4 tr = craneObj[3]->transform.make_world_to_local();
-            
-            glm::vec3 localPostion;
-            localPostion.x =tr[3][0];
-            localPostion.y =tr[3][1];
-            localPostion.z =tr[3][2];
-            
-          
-//            std::cout<<localPostion.x << " " << localPostion.y << " " << localPostion.z << "\n";
-//            
-            std::cout<< glm::distance(Balloon1->transform.position,localPostion) << "\n";
-            
+            // Move objects x/y position based off it's velocity vector
+//            Player1->transform.position.x += (gameObject.velocity.x * elapsedSeconds);
+//            Player1->transform.position.y += (gameObject.velocity.y * elapsedSeconds);
             
             //camera:
 			scene.camera.transform.position = camera.radius * glm::vec3(

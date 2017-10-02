@@ -63,6 +63,7 @@ struct Scene {
 		GLuint program = 0;
 		GLuint program_mvp = -1U; //uniform index for MVP matrix
 		GLuint program_itmv = -1U; //uniform index for inverse(transpose(mv)) matrix
+        glm::vec3 velocity = glm::vec3(0.0f,0.0f,0.0f);
 	};
 	struct Light {
 		Transform transform;
