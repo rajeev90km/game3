@@ -2,7 +2,7 @@ NOTE: please fill in the first section with information about your game.
 
 # *Game Title*
 
-Cube Volleyball [*Design Document*](http://graphics.cs.cmu.edu/courses/15-466-f17/game3-designs/rmukunda/) for game2 in 15-466-f17.
+Cube Volleyball [*Design Document*](http://graphics.cs.cmu.edu/courses/15-466-f17/game3-designs/rmukunda/) for game3 in 15-466-f17.
 
 ![Screenshot](cube_volleyball.png)
 
