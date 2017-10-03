@@ -23,12 +23,10 @@ std::unordered_map<Scene::Object*,bool> isJumping;
 
 //with plane
 bool checkCollisionWithPlane(Scene::Object* obj1, Scene::Object* obj2){
-//    std::cout << std::abs(obj1->transform.position.z - obj1->transform.scale.z) << "\n";
     if(canJump[obj1]==false){
         if (obj1->transform.position.z - obj1->transform.scale.z<=obj2->transform.position.z) {
             obj1->velocity = glm::vec3(0.0f);
             canJump[obj1] = true;
-//            std::cout<<obj1->transform.position.z;
             return true;
         }
     }
@@ -45,21 +43,16 @@ bool cubeSphereCollision(Scene::Object* cube, Scene::Object* sphere)
         (cube->transform.position.y+cube->transform.scale.y > sphere->transform.position.y) &&
         (cube->transform.position.y < sphere->transform.position.y + sphere->transform.scale.z)) {
         
-//        float cor = 1.0f;
         glm::vec3 N = glm::normalize(sphere->transform.position - cube->transform.position);
-//        glm::vec3 reflected = 2.0f * N * (N*sphere->velocity);
         glm::vec3 new_vel = sphere->velocity - 2.0f * glm::dot(sphere->velocity, N) * N;
         
-//        std::cout<< cube->velocity.z << "\n";
+        //Like slime volleyball
         if(cube->velocity.z==0){
             sphere->velocity = new_vel;
         }
         else{
             sphere->velocity =  cube->velocity * 1.75f;
-//            cube->velocity = glm::vec3(0.0f,0.0f,0.0f);
         }
-        
-//        std::cout << sphere->velocity.x << " " << sphere->velocity.y << " " << sphere->velocity.z << "\n";
         
         return true;
     }
